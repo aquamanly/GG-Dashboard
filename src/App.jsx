@@ -6,7 +6,91 @@ import { supabase } from './supabase';
 const AVAILABLE_ROLES = ['rep', 'manager', 'admin', 'trainee']; // Missing definition
 // --- MOCK DATA & CONFIGURATION ---
 
-
+const LoginView = () => {
+    const [mode, setMode] = useState('password'); // 'password' | 'magic'
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isBusy, setIsBusy] = useState(false);
+    const [msg, setMsg] = useState('');
+  
+    const signInWithPassword = async (e) => {
+      e.preventDefault();
+      setIsBusy(true); setMsg('');
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setMsg(error.message);
+      setIsBusy(false);
+    };
+  
+    const signInWithMagic = async (e) => {
+      e.preventDefault();
+      setIsBusy(true); setMsg('');
+      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin }});
+      if (error) setMsg(error.message);
+      else setMsg('Magic link sent! Check your email.');
+      setIsBusy(false);
+    };
+  
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-1">Welcome back</h2>
+          <p className="text-gray-500 mb-6">Sign in to access the dashboard</p>
+  
+          <div className="flex gap-2 mb-4">
+            <button
+              className={`px-3 py-2 rounded-lg font-semibold ${mode==='password' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+              onClick={() => setMode('password')}
+            >
+              Email + Password
+            </button>
+            <button
+              className={`px-3 py-2 rounded-lg font-semibold ${mode==='magic' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+              onClick={() => setMode('magic')}
+            >
+              Magic Link
+            </button>
+          </div>
+  
+          <form onSubmit={mode==='password' ? signInWithPassword : signInWithMagic} className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <input
+                type="email"
+                className="mt-1 w-full border rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                value={email}
+                onChange={(e)=>setEmail(e.target.value)}
+                required
+              />
+            </div>
+  
+            {mode === 'password' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <input
+                  type="password"
+                  className="mt-1 w-full border rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={password}
+                  onChange={(e)=>setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+  
+            {msg && <div className="text-sm text-red-600">{msg}</div>}
+  
+            <button
+              type="submit"
+              disabled={isBusy}
+              className={`w-full py-2 rounded-lg font-semibold ${isBusy ? 'bg-blue-400 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+            >
+              {isBusy ? 'Working…' : (mode==='password' ? 'Sign In' : 'Send Magic Link')}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+  
 const ALL_ACTIVITIES = [
   'Not Home',
   'Sold',
@@ -593,147 +677,173 @@ const DashboardView = ({ logs, currentState, handleSort, handleFilterChange, han
 // --- MAIN APP COMPONENT ---
 
 const App = () => {
-  // Global App View State
-  const [view, setView] = useState('dashboard'); // 'dashboard' or 'users'
-
-  // Dashboard States (retained from previous version)
-  const [allLogs, setAllLogs] = useState([]);
-  const [currentState, setCurrentState] = useState({
+    // 🔐 Auth session
+    const [session, setSession] = useState(null);
+    const [checkingSession, setCheckingSession] = useState(true);
+  
+    useEffect(() => {
+      let mounted = true;
+  
+      const init = async () => {
+        const { data } = await supabase.auth.getSession();
+        if (mounted) setSession(data.session ?? null);
+        setCheckingSession(false);
+      };
+      init();
+  
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+        setSession(sess);
+      });
+  
+      return () => {
+        mounted = false;
+        sub.subscription?.unsubscribe?.();
+      };
+    }, []);
+  
+    // ---------------- Existing state  ----------------
+    const [view, setView] = useState('dashboard'); // 'dashboard' | 'users'
+  
+    const [allLogs, setAllLogs] = useState([]);
+    const [currentState, setCurrentState] = useState({
       searchTerm: '',
       filterActivity: 'All',
       sortColumn: 'logged_at',
       sortDirection: 'desc'
-  });
-  const [analysis, setAnalysis] = useState({ specialSalesLeader: { email: 'N/A', specialSales: 0 }, topOverallSalesmen: [] });
-  const [isLoading, setIsLoading] = useState(true);
-
-  // --- Data Fetching Effect for Dashboard ---
-  useEffect(() => {
+    });
+    const [analysis, setAnalysis] = useState({ specialSalesLeader: { email: 'N/A', specialSales: 0 }, topOverallSalesmen: [] });
+    const [isLoading, setIsLoading] = useState(true);
+  
+    useEffect(() => {
+      // Only load data if authenticated
+      if (!session) return;
       const loadData = async () => {
-          try {
-              const logs = await fetchActivityLogs();
-              setAllLogs(logs);
-              const initialAnalysis = analyzeSalesData(logs);
-              setAnalysis(initialAnalysis);
-          } catch (error) {
-              console.error("Dashboard initialization failed:", error);
-          } finally {
-              setIsLoading(false);
-          }
+        try {
+          setIsLoading(true);
+          const logs = await fetchActivityLogs();
+          setAllLogs(logs);
+          setAnalysis(analyzeSalesData(logs));
+        } catch (e) {
+          console.error("Dashboard initialization failed:", e);
+        } finally {
+          setIsLoading(false);
+        }
       };
       loadData();
-  }, []); // Runs once on mount
-
-  // --- Filtering and Sorting Logic for Dashboard ---
-  const filteredAndSortedLogs = useMemo(() => {
+    }, [session]);
+  
+    const filteredAndSortedLogs = useMemo(() => {
       let logs = allLogs.slice();
       const { searchTerm, filterActivity, sortColumn, sortDirection } = currentState;
-
-      // 1. Filtering
       logs = logs.filter(log => {
-          const matchesSearch = log.user_email.toLowerCase().includes(searchTerm.toLowerCase());
-          const matchesActivity = filterActivity === 'All' || (Array.isArray(log.activity_type) && log.activity_type.includes(filterActivity));
-          return matchesSearch && matchesActivity;
+        const matchesSearch = log.user_email.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesActivity = filterActivity === 'All' || (Array.isArray(log.activity_type) && log.activity_type.includes(filterActivity));
+        return matchesSearch && matchesActivity;
       });
-
-      // 2. Sorting
       logs.sort((a, b) => {
-          let valA, valB;
-
-          if (sortColumn === 'logged_at') {
-              valA = new Date(a.logged_at).getTime();
-              valB = new Date(b.logged_at).getTime();
-          } else if (sortColumn === 'user_email') {
-              valA = a.user_email.toLowerCase();
-              valB = b.user_email.toLowerCase();
-          } else {
-              return 0;
-          }
-
-          if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-          if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-          return 0;
+        let valA, valB;
+        if (sortColumn === 'logged_at') {
+          valA = new Date(a.logged_at).getTime();
+          valB = new Date(b.logged_at).getTime();
+        } else if (sortColumn === 'user_email') {
+          valA = a.user_email.toLowerCase();
+          valB = b.user_email.toLowerCase();
+        } else return 0;
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
       });
-
       return logs;
-  }, [allLogs, currentState]); // Re-calculates when logs or filters/sort changes
-
-  // --- Handlers for Dashboard ---
-  const handleSort = useCallback((column) => {
+    }, [allLogs, currentState]);
+  
+    const handleSort = useCallback((column) => {
       setCurrentState(prev => {
-          let newDirection = 'desc';
-          if (prev.sortColumn === column) {
-              newDirection = prev.sortDirection === 'asc' ? 'desc' : 'asc';
-          } else {
-              newDirection = column === 'logged_at' ? 'desc' : 'asc'; // Default date to desc, email to asc
-          }
-          return { ...prev, sortColumn: column, sortDirection: newDirection };
+        let newDirection = 'desc';
+        if (prev.sortColumn === column) {
+          newDirection = prev.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          newDirection = column === 'logged_at' ? 'desc' : 'asc';
+        }
+        return { ...prev, sortColumn: column, sortDirection: newDirection };
       });
-  }, []);
-
-  const handleFilterChange = (e) => {
-      setCurrentState(prev => ({
-          ...prev,
-          filterActivity: e.target.value
-      }));
-  };
-
-  const handleSearchChange = (e) => {
-      setCurrentState(prev => ({
-          ...prev,
-          searchTerm: e.target.value.trim()
-      }));
-  };
-
-  const renderContent = () => {
+    }, []);
+  
+    const handleFilterChange = (e) => setCurrentState(prev => ({ ...prev, filterActivity: e.target.value }));
+    const handleSearchChange = (e) => setCurrentState(prev => ({ ...prev, searchTerm: e.target.value.trim() }));
+  
+    const renderContent = () => {
       if (view === 'dashboard') {
-          return (
-              <DashboardView 
-                  logs={allLogs}
-                  currentState={currentState}
-                  handleSort={handleSort}
-                  handleFilterChange={handleFilterChange}
-                  handleSearchChange={handleSearchChange}
-                  analysis={analysis}
-                  isLoading={isLoading}
-                  filteredAndSortedLogs={filteredAndSortedLogs}
-              />
-          );
-      } else if (view === 'users') {
-          return <UserRolesManager />;
+        return (
+          <DashboardView
+            logs={allLogs}
+            currentState={currentState}
+            handleSort={handleSort}
+            handleFilterChange={handleFilterChange}
+            handleSearchChange={handleSearchChange}
+            analysis={analysis}
+            isLoading={isLoading}
+            filteredAndSortedLogs={filteredAndSortedLogs}
+          />
+        );
       }
+      if (view === 'users') return <UserRolesManager />;
       return <div className="text-center py-10">404 View Not Found</div>;
-  };
-
-
-  // --- Main JSX Return ---
-  return (
+    };
+  
+    // 🔐 Gate: if not signed in, show Login
+    if (checkingSession) {
+      return (
+        <div className="min-h-screen flex items-center justify-center text-gray-600">
+          Checking session…
+        </div>
+      );
+    }
+    if (!session) {
+      return <LoginView />;
+    }
+  
+    // ✅ Authenticated UI
+    return (
       <div className="bg-gray-100 font-sans min-h-screen p-4 sm:p-8">
-          {/* Navigation Bar */}
-          <nav className="max-w-7xl mx-auto mb-8 bg-white p-3 rounded-xl shadow-md flex space-x-4">
-              <button
-                  onClick={() => setView('dashboard')}
-                  className={`px-4 py-2 font-semibold rounded-lg transition duration-150 ${
-                      view === 'dashboard' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-              >
-                  Sales Dashboard
-              </button>
-              <button
-                  onClick={() => setView('users')}
-                  className={`px-4 py-2 font-semibold rounded-lg transition duration-150 ${
-                      view === 'users' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-              >
-                  Manage Users
-              </button>
-          </nav>
-
-          <main className="max-w-7xl mx-auto">
-              {renderContent()}
-          </main>
+        <nav className="max-w-7xl mx-auto mb-8 bg-white p-3 rounded-xl shadow-md flex flex-wrap gap-2 items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setView('dashboard')}
+              className={`px-4 py-2 font-semibold rounded-lg transition ${
+                view === 'dashboard' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Sales Dashboard
+            </button>
+            <button
+              onClick={() => setView('users')}
+              className={`px-4 py-2 font-semibold rounded-lg transition ${
+                view === 'users' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Manage Users
+            </button>
+          </div>
+  
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500 hidden sm:block">
+              {session.user?.email}
+            </span>
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="px-3 py-2 rounded-lg font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700"
+            >
+              Sign Out
+            </button>
+          </div>
+        </nav>
+  
+        <main className="max-w-7xl mx-auto">
+          {renderContent()}
+        </main>
       </div>
-  );
-};
+    );
+  };
+  
 
 export default App;

@@ -6,6 +6,7 @@ import DashboardView from './components/DashboardView';
 import UserRolesManager from './components/UserRolesManager';
 import { fetchActivityLogs } from './services/activityLogs';
 import { analyzeSalesData } from './utils/analyzeSalesData';
+import GeckoGreenTracker from './components/GeckoGreenTracker';
 
 
 const App = () => {
@@ -59,7 +60,7 @@ const App = () => {
         fetchRole();
     }, [session]);
 
-    // ---------------- Existing state  ----------------
+    // ---------------- Existing state  ---------------- uid, display name, email, phone, providers, provider type, created at, last sign in at, 
     const [view, setView] = useState('dashboard'); // 'dashboard' | 'users'
 
     const [allLogs, setAllLogs] = useState([]);
@@ -155,6 +156,10 @@ const App = () => {
             }
             return <UserRolesManager />;
         }
+        if (view === 'commission') {
+           
+            return <GeckoGreenTracker />;
+        }
 
         return <div className="text-center py-10">404 View Not Found</div>;
     };
@@ -185,6 +190,7 @@ const App = () => {
                         Sales Dashboard
                     </button>
                     {userRole === 'admin' && (
+
                         <button
                             onClick={() => setView('users')}
                             className={`px-4 py-2 font-semibold rounded-lg transition ${view === 'users' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
@@ -192,7 +198,17 @@ const App = () => {
                         >
                             Manage Users
                         </button>
+
                     )}
+
+                        <button
+                            onClick={() => setView('commission')}
+                            className={`px-4 py-2 font-semibold rounded-lg transition ${view === 'commission' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                        >
+                            Commission tracker
+                        </button>
+
                 </div>
 
                 <div className="flex items-center gap-3">

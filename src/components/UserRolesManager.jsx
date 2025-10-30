@@ -1,7 +1,104 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { fetchUserRoles, updateUserRole } from '../services/userRoles';
 
+// 1. Define the component constants outside
 const AVAILABLE_ROLES = ['rep', 'manager', 'admin', 'trainee'];
+
+// 2. Define EditModal OUTSIDE the main component
+const EditModal = ({ editingUser, handleEditChange, handleSave, setEditingUser, isSaving }) => {
+    if (!editingUser) return null;
+
+    // ... (rest of the EditModal code, unchanged)
+    // Note: The AVAILABLE_ROLES array is available globally now.
+
+    return (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 transform transition-all">
+                <h3 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Edit User: {editingUser.first_name} {editingUser.last_name}</h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                    {/* First Name */}
+                    <label className="block">
+                        <span className="text-sm font-medium text-gray-700">First Name</span>
+                        <input 
+                            type="text"
+                            name="first_name"
+                            value={editingUser.first_name || ''}
+                            onChange={handleEditChange}
+                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border"
+                        />
+                    </label>
+                    {/* Last Name */}
+                    <label className="block">
+                        <span className="text-sm font-medium text-gray-700">Last Name</span>
+                        <input 
+                            type="text"
+                            name="last_name"
+                            value={editingUser.last_name || ''}
+                            onChange={handleEditChange}
+                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border"
+                        />
+                    </label>
+                    {/* Role */}
+                    <label className="block">
+                        <span className="text-sm font-medium text-gray-700">Role</span>
+                        <select
+                            name="role"
+                            value={editingUser.role || 'rep'}
+                            onChange={handleEditChange}
+                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white"
+                        >
+                            {AVAILABLE_ROLES.map(role => (
+                                <option key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</option>
+                            ))}
+                        </select>
+                    </label>
+                    {/* Team */}
+                    <label className="block">
+                        <span className="text-sm font-medium text-gray-700">Team</span>
+                        <input 
+                            type="text"
+                            name="team"
+                            value={editingUser.team || ''}
+                            onChange={handleEditChange}
+                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border"
+                        />
+                    </label>
+                    {/* Name Abbreviation */}
+                    <label className="block col-span-2">
+                        <span className="text-sm font-medium text-gray-700">Name Abbreviation (e.g., JD)</span>
+                        <input 
+                            type="text"
+                            name="name_abreviation"
+                            value={editingUser.name_abreviation || ''}
+                            onChange={handleEditChange}
+                            maxLength={3}
+                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border"
+                        />
+                    </label>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mt-6 flex justify-end space-x-3">
+                    <button
+                        onClick={() => setEditingUser(null)}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition duration-150"
+                        disabled={isSaving}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        className={`px-4 py-2 text-white font-semibold rounded-lg transition duration-150 ${isSaving ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                        disabled={isSaving}
+                    >
+                        {isSaving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // (Paste your full UserRolesManager component here, unchanged)
 const UserRolesManager = () => {
@@ -124,97 +221,7 @@ const UserRolesManager = () => {
         );
     };
   
-    const EditModal = () => {
-        if (!editingUser) return null;
-  
-        return (
-            <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 transform transition-all">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Edit User: {editingUser.first_name} {editingUser.last_name}</h3>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        {/* First Name */}
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-700">First Name</span>
-                            <input 
-                                type="text"
-                                name="first_name"
-                                value={editingUser.first_name || ''}
-                                onChange={handleEditChange}
-                                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border"
-                            />
-                        </label>
-                        {/* Last Name */}
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-700">Last Name</span>
-                            <input 
-                                type="text"
-                                name="last_name"
-                                value={editingUser.last_name || ''}
-                                onChange={handleEditChange}
-                                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border"
-                            />
-                        </label>
-                        {/* Role */}
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-700">Role</span>
-                            <select
-                                name="role"
-                                value={editingUser.role || 'rep'}
-                                onChange={handleEditChange}
-                                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border bg-white"
-                            >
-                                {AVAILABLE_ROLES.map(role => (
-                                    <option key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</option>
-                                ))}
-                            </select>
-                        </label>
-                        {/* Team */}
-                        <label className="block">
-                            <span className="text-sm font-medium text-gray-700">Team</span>
-                            <input 
-                                type="text"
-                                name="team"
-                                value={editingUser.team || ''}
-                                onChange={handleEditChange}
-                                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border"
-                            />
-                        </label>
-                        {/* Name Abbreviation */}
-                        <label className="block col-span-2">
-                            <span className="text-sm font-medium text-gray-700">Name Abbreviation (e.g., JD)</span>
-                            <input 
-                                type="text"
-                                name="name_abreviation"
-                                value={editingUser.name_abreviation || ''}
-                                onChange={handleEditChange}
-                                maxLength={3}
-                                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border"
-                            />
-                        </label>
-                    </div>
-  
-                    {/* Action Buttons */}
-                    <div className="mt-6 flex justify-end space-x-3">
-                        <button
-                            onClick={() => setEditingUser(null)}
-                            className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition duration-150"
-                            disabled={isSaving}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            className={`px-4 py-2 text-white font-semibold rounded-lg transition duration-150 ${isSaving ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-                            disabled={isSaving}
-                        >
-                            {isSaving ? 'Saving...' : 'Save Changes'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
+    
   
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-indigo-500">
@@ -233,8 +240,13 @@ const UserRolesManager = () => {
                 />
             </div>
   
-            <UserTable />
-            <EditModal />
+            <UserTable /><EditModal
+                editingUser={editingUser}
+                handleEditChange={handleEditChange}
+                handleSave={handleSave}
+                setEditingUser={setEditingUser}
+                isSaving={isSaving}
+            />
         </div>
     );
   };
